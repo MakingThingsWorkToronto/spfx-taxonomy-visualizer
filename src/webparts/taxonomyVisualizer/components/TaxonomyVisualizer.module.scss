@@ -1,0 +1,33 @@
+@import '~office-ui-fabric-react/dist/sass/References.scss';
+
+.webPartTitle span { font-weight: 600 !important; font-size: 20px !important; }
+
+.topicsExpertiseWebPart {
+    .topicsExpertise {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        .topicGroup {
+            box-sizing: border-box;
+            margin-bottom: 1rem;
+            .topicHeader { 
+                a { display: block; font-size: large; text-decoration: none; color: "[theme: neutralPrimary, default: #333333]"; } 
+            }
+            .topicChild { 
+                a { display: block; }
+            }
+        }
+        .shimmerLine { margin-bottom: 1rem; }
+    }
+    .topicsExpertise::after {
+        content: "";
+        flex: auto;
+    }
+
+    .topicsExpertise.col1 { .shimmerBlock, .topicGroup { width: 100%; } }
+    .topicsExpertise.col2 { .shimmerBlock, .topicGroup { width: calc(50%-0.5rem); } }
+    .topicsExpertise.col3 { .shimmerBlock, .topicGroup { width: calc(33%-0.5rem); } }
+    .topicsExpertise.col4 { .shimmerBlock, .topicGroup { width: calc(25%-0.5rem); } }
+    .topicsExpertise.col5 { .shimmerBlock, .topicGroup { width: calc(20%-0.5rem); } }
+}
