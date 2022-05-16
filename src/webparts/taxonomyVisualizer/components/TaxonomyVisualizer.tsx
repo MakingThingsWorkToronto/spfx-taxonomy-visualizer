@@ -1,7 +1,6 @@
 import * as React from 'react';
 import styles from './TaxonomyVisualizer.module.scss';
 import { ITaxonomyVisualizerProps } from './ITaxonomyVisualizerProps';
-import { escape } from '@microsoft/sp-lodash-subset';
 import { Link, Shimmer } from 'office-ui-fabric-react';
 import { Term } from '../../../services/TaxonomyService';
 import { WebPartTitle } from "@pnp/spfx-controls-react/lib/WebPartTitle";
@@ -19,18 +18,17 @@ export default class TopicsExpertise extends React.Component<ITaxonomyVisualizer
 
   private _resizeTimer: number;
   private _resizeObserver: ResizeObserver;
-  private _orderedBreakpoints: IColumnBreakpoints[] = [];
+  private _termSetId: string; 
+  private _refershTimer: number;
 
   constructor(props:ITaxonomyVisualizerProps) {
     super(props);
     
-    if(this.props.breakpoints && this.props.breakpoints.length > 0) {
-      this._orderedBreakpoints = this.props.breakpoints.sort((a,b)=>{ return a.minPixels < b.minPixels ? -1 : 1; });
-    }
-
     const webPartZone = this.getWebPartZone(props.domElement);
     const width : number = webPartZone.getBoundingClientRect().width;
     const columns = this.getColumnsFromWidth(width, 1);
+
+    this._termSetId = props.termSetId;
 
     this.state = {
       terms: [],
@@ -45,6 +43,12 @@ export default class TopicsExpertise extends React.Component<ITaxonomyVisualizer
     
     this._resizeObserver = new ResizeObserver(this.handleResize.bind(this));
     this._resizeObserver.observe(this.state.WebPartZone);
+    
+    this.refreshTerms();
+
+  }
+
+  public async refreshTerms() : Promise<void> {
 
     if(this.props.termSetId && typeof this.props.lcid !== "undefined") {
 
@@ -64,6 +68,17 @@ export default class TopicsExpertise extends React.Component<ITaxonomyVisualizer
   }
 
   public render(): React.ReactElement<ITaxonomyVisualizerProps> {
+    
+    const webPartZone = this.getWebPartZone(this.props.domElement);
+    const width : number = webPartZone.getBoundingClientRect().width;
+    const columns = this.getColumnsFromWidth(width, 1);
+
+    if(this._termSetId != this.props.termSetId) {
+      this._termSetId = this.props.termSetId;
+      if(this._refershTimer) window.clearTimeout(this._refershTimer);
+      this._refershTimer = window.setTimeout(()=>{this.refreshTerms();}, 100);
+    }
+
     return <div className={styles.topicsExpertiseWebPart}>
         <WebPartTitle displayMode={this.props.displayMode}
               title={this.props.title}
@@ -71,14 +86,14 @@ export default class TopicsExpertise extends React.Component<ITaxonomyVisualizer
               themeVariant={this.props.theme}
               className={styles.webPartTitle}
               />
-          {this.state.loaded ? this.renderTopics() : this.renderShimmer()}
+          {this.state.loaded ? this.renderTopics(columns) : this.renderShimmer(columns)}
       </div>;
   }
 
-  private renderShimmer() : JSX.Element {
-    const columnClassName : string = this.getColumns();
+  private renderShimmer(columns:number) : JSX.Element {
+    const columnClassName : string = this.getColumnsCSSClassName(columns);
     let shimmers : JSX.Element[] = [];
-    for(var i = 0; i<this.state.columns; i++) {  shimmers.push(this.renderShimmerBlock()); }
+    for(var i = 0; i<columns; i++) {  shimmers.push(this.renderShimmerBlock()); }
 
     return (
       <div className={ styles.topicsExpertise + " " + columnClassName }>
@@ -95,13 +110,13 @@ export default class TopicsExpertise extends React.Component<ITaxonomyVisualizer
     </div>);
   }
 
-  private renderTopics() : JSX.Element {
-    const extraColumns = (this.state.terms || []).length % this.state.columns;
+  private renderTopics(columns:number) : JSX.Element {
+    const extraColumns = (this.state.terms || []).length % columns;
     const placeHolderElements : JSX.Element[] = [];
     for(var i=0;i<extraColumns;i++){
       placeHolderElements.push(<div className={styles.topicGroup}>&nbsp;</div>);
     }
-    const columnClassName : string = this.getColumns();
+    const columnClassName : string = this.getColumnsCSSClassName(columns);
     return (
       <div className={ styles.topicsExpertise + " " + columnClassName }>
         {this.state.terms.map((term: Term)=>{
@@ -112,9 +127,9 @@ export default class TopicsExpertise extends React.Component<ITaxonomyVisualizer
     );
   }
 
-  private getColumns():string {
-    if(typeof this.state.columns === "undefined") return styles.col1;
-    const styleName = "col" + this.state.columns.toString();
+  private getColumnsCSSClassName(columns:number):string {
+    if(typeof columns === "undefined") return styles.col1;
+    const styleName = "col" + columns.toString();
     return styles[styleName];
   }
 
@@ -141,13 +156,32 @@ export default class TopicsExpertise extends React.Component<ITaxonomyVisualizer
 
   private getLinkHref(term:Term) : string {
     
-    return !this.props.linkTemplate 
+    let linkTemplate:string = !this.props.linkTemplate 
       ? ""
       : this.props.linkTemplate
           .replace(/\{TermLabel\}/g, term.Label)
           .replace(/\{TermGuid\}/g, term.Id)
           .replace(/\{TermSetId\}/g, this.props.termSetId)
           .replace(/\{TermName\}/g, term.Name);
+
+    const matchCustom:RegExp = new RegExp(/\{(.*?)\}/g);
+    const matchResults = linkTemplate.match(matchCustom);
+    
+    if(matchResults && matchResults.length > 0) {
+
+      matchResults.map((match:string)=>{
+        const property = match.substr(1,match.length-2);
+        const value = term[property];
+        if(typeof value === "string") {
+          linkTemplate = linkTemplate.replace(match, value);
+        } else {
+          linkTemplate = linkTemplate.replace(match, "");
+        }
+      });
+
+    }
+
+    return linkTemplate;
 
   }
 
@@ -171,18 +205,27 @@ export default class TopicsExpertise extends React.Component<ITaxonomyVisualizer
   }
 
   private getColumnsFromWidth(width: number, cols: number) : number {
+    
     let columns = cols;
-    this._orderedBreakpoints.map((breakpoint)=> {
+    let orderedBreakpoints = [];
+
+    if(this.props.breakpoints && this.props.breakpoints.length > 0) {
+      orderedBreakpoints = this.props.breakpoints.sort((a,b)=>{ return a.minPixels < b.minPixels ? -1 : 1; });
+    }
+
+    orderedBreakpoints.map((breakpoint)=> {
       if(breakpoint.minPixels <= width) {
         columns = breakpoint.columns;
       }
     });
+
     return columns;
+
   }
   
   private getWebPartZone(element:HTMLElement) : HTMLElement {
     return this.props.displayMode === DisplayMode.Edit
-      ? element.closest(".ControlZone--edit") as HTMLElement
+      ? (element.closest(".ControlZone--edit") as HTMLElement) || (element.closest(".ControlZone--control") as HTMLElement) || (element.closest(".ControlZone-control") as HTMLElement) || (element.closest(".ControlZone") as HTMLElement)
       : (element.closest(".ControlZone--control") as HTMLElement) || (element.closest(".ControlZone-control") as HTMLElement) || element.closest(".ControlZone") as HTMLElement;
       
   }

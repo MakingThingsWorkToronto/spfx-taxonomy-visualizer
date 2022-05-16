@@ -1,7 +1,6 @@
-import { taxonomy, ITermStore, ITermSet, ITerm, ITerms, ITermData } from "@pnp/sp-taxonomy";
+import { taxonomy, ITermSet, ITerm, ITerms } from "@pnp/sp-taxonomy";
 import { sp } from "@pnp/sp";
 import { WebPartContext } from "@microsoft/sp-webpart-base";
-import { Guid } from "@microsoft/sp-core-library";
 
 export interface Label {
     IsDefaultForLanguage: boolean;
@@ -17,6 +16,7 @@ export interface Term {
     AllLabels:Label[];
     Label: string;
     Id: string;
+    [key:string]:any;
 }
 
 export class TaxonomyService {
@@ -42,7 +42,7 @@ export class TaxonomyService {
 
     private async getTerms(terms:ITerms, lcid: number) : Promise<Term[]> {
 
-        const all: (ITerm)[] = await terms.select("Name", "Id", "TermsCount", "Parent", "Labels").get();
+        const all: (ITerm)[] = await terms.select("Name", "Id", "TermsCount", "Parent", "Labels", "CustomProperties", "LocalCustomProperties").get();
         let ret:Term[] = [];
         let termHash:object = {};
         
@@ -70,7 +70,9 @@ export class TaxonomyService {
                 TermCount: data.TermsCount,
                 Name: name,
                 AllLabels : labels,
-                Label: defaultLabel
+                Label: defaultLabel,
+                ...data.CustomProperties,
+                ...data.LocalCustomProperties
             };
 
             if(!data.Parent) {

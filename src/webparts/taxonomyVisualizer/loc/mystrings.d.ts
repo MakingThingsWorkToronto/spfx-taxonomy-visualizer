@@ -7,6 +7,7 @@ declare interface ITaxonomyVisualizerWebPartStrings {
   ColumnsLabel:string;
   EditBreakpointsLabel:string;
   MaxPixelsLabel:string;
+  TermSetInfoLabel:string;
 }
 
 declare module 'TaxonomyVisualizerWebPartStrings' {

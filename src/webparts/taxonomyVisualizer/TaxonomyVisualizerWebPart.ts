@@ -12,7 +12,6 @@ import TopicsExpertise from './components/TaxonomyVisualizer';
 import { ITaxonomyVisualizerProps } from './components/ITaxonomyVisualizerProps';
 import { ThemeProvider, ThemeChangedEventArgs, IReadonlyTheme } from '@microsoft/sp-component-base';
 import { TaxonomyService } from '../../services/TaxonomyService';
-import { PropertyFieldNumber } from '@pnp/spfx-property-controls/lib/PropertyFieldNumber';
 import LocalizationHelper from '../../helper/LocalizationHelper';
 import { IColumnBreakpoints } from '../../models/IColumnBreakpoints';
 import { PropertyFieldCollectionData, CustomCollectionFieldType } from '@pnp/spfx-property-controls/lib/PropertyFieldCollectionData';
@@ -31,21 +30,20 @@ export default class TaxonomyVisualizerWebPart extends BaseClientSideWebPart <IT
   private _themeVariant: IReadonlyTheme | undefined;
   private _taxonomyService: TaxonomyService;
 
-  public onInit():Promise<void>{
-    return super.onInit().then(me => {
+  public async onInit():Promise<void>{
+    
+    await super.onInit();
+    
+    // Consume the new ThemeProvider service
+    this._themeProvider = this.context.serviceScope.consume(ThemeProvider.serviceKey);
 
-      // Consume the new ThemeProvider service
-      this._themeProvider = this.context.serviceScope.consume(ThemeProvider.serviceKey);
+    // If it exists, get the theme variant
+    this._themeVariant = this._themeProvider.tryGetTheme();
+    
+    // Register a handler to be notified if the theme variant changes
+    this._themeProvider.themeChangedEvent.add(this, this._handleThemeChangedEvent);
+    this._taxonomyService = new TaxonomyService(this.context, this.properties.termSetId);
 
-      // If it exists, get the theme variant
-      this._themeVariant = this._themeProvider.tryGetTheme();
-
-      // Register a handler to be notified if the theme variant changes
-      this._themeProvider.themeChangedEvent.add(this, this._handleThemeChangedEvent);
-
-      this._taxonomyService = new TaxonomyService(this.context, this.properties.termSetId);
-
-    });
   }
 
   public render(): void {
@@ -89,11 +87,26 @@ export default class TaxonomyVisualizerWebPart extends BaseClientSideWebPart <IT
     ReactDom.unmountComponentAtNode(this.domElement);
   }
 
+  protected onPropertyPaneFieldChanged(propertyPath: string, oldValue: any, newValue: any): void {
+    
+    super.onPropertyPaneFieldChanged(propertyPath, oldValue, newValue);
+
+    if(propertyPath === "termSetId") {
+      this._taxonomyService = new TaxonomyService(this.context, newValue);
+    }
+
+    if((propertyPath === "breakpoints" || propertyPath === "termSetId" || propertyPath === "linkTemplate") && newValue) {
+      this.render();
+    }
+
+  }
+
   protected get dataVersion(): Version {
     return Version.parse('1.0');
   }
 
   protected getPropertyPaneConfiguration(): IPropertyPaneConfiguration {
+
     return {
       pages: [
         {
@@ -109,14 +122,6 @@ export default class TaxonomyVisualizerWebPart extends BaseClientSideWebPart <IT
                 }),
                 PropertyPaneTextField('linkTemplate', {
                   label: strings.LinkTemplateLabel
-                }),
-                PropertyFieldNumber("levels", {
-                  key: "levels",
-                  label: strings.LevelsLabel,
-                  value: this.properties.levels,
-                  maxValue: 2,
-                  minValue: 1,
-                  disabled: false
                 }),
                 PropertyFieldCollectionData("breakpoints", {
                   key: "breakpoints",

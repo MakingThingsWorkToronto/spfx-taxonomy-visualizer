@@ -3,10 +3,17 @@
   "solution": {
     "name": "Taxonomy Visualizer",
     "id": "d88ae4fa-312d-4a23-be9b-d9c8f63096c3",
-    "version": "1.0.0.0",
+    "version": "1.0.1.0",
     "includeClientSideAssets": true,
     "skipFeatureDeployment": true,
-    "isDomainIsolated": false
+    "isDomainIsolated": false,
+    "developer": {
+      "name": "Making Things Work Ltd.",
+      "privacyUrl": "https://makingthings.work",
+      "termsOfUseUrl": "",
+      "websiteUrl": "https://makingthings.work",
+      "mpnId": ""
+    }
   },
   "paths": {
     "zippedPackage": "solution/spfx-taxonomy-visualizer.sppkg"
